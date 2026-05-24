@@ -12,7 +12,7 @@ class MainScene extends Phaser.Scene {
         // jogador nasce na parte inferior do mapa
         this.player = this.physics.add.sprite(400, 580, 'ant').setScale(2);
         this.player.setCollideWorldBounds(true);
-        this.player.speed = 180;
+        this.player.speed = 65;
         this.player.health = 100;
 
         // controle de tiro único
