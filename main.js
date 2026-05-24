@@ -55,6 +55,28 @@ class MainScene extends Phaser.Scene {
 
         // HUD
         this.hpText = this.add.text(10, 10, 'HP: ' + this.player.health, { font: '16px Arial', fill: '#fff' }).setScrollFactor(0);
+        this.createAngleHud();
+    }
+
+    createAngleHud() {
+        const padding = 10;
+        this.angleHudText = this.add.text(
+            this.scale.width - padding,
+            padding,
+            '',
+            {
+                font: '16px Arial',
+                fill: '#fff',
+                backgroundColor: '#000000aa',
+                padding: { x: 10, y: 6 }
+            }
+        ).setOrigin(1, 0).setScrollFactor(0).setDepth(10);
+        this.updateAngleHud();
+    }
+
+    updateAngleHud() {
+        const angleDeg = Math.round(Phaser.Math.RadToDeg(-this.weaponAngle));
+        this.angleHudText.setText('Ângulo: ' + angleDeg + '°');
     }
 
     update(time, delta) {
@@ -86,6 +108,7 @@ class MainScene extends Phaser.Scene {
 
         // atualizar HUD
         this.hpText.setText('HP: ' + Math.max(0, Math.round(this.player.health)));
+        this.updateAngleHud();
     }
 
     shoot(chargeTime) {
