@@ -37,7 +37,7 @@ class MainScene extends Phaser.Scene {
 
         // ângulo da arma (bloco preto) — controlado pelas setas cima/baixo
         this.weaponAngle = -Math.PI / 4;
-        this.weaponAngleSpeed = 2.5;
+        this.weaponAngleSpeedDeg = 65;
         this.weaponMinAngle = -Math.PI + 0.1;
         this.weaponMaxAngle = -0.1;
         this.weapon = this.add.rectangle(this.player.x, this.player.y, 24, 8, 0x000000);
@@ -89,11 +89,12 @@ class MainScene extends Phaser.Scene {
         this.player.setVelocityX(vx * this.player.speed);
 
         // ajuste de ângulo da arma pelas setas cima/baixo
+        const angleStep = Phaser.Math.DegToRad(this.weaponAngleSpeedDeg) * delta / 1000;
         if (this.cursors.up.isDown) {
-            this.weaponAngle += this.weaponAngleSpeed * delta / 1000;
+            this.weaponAngle += angleStep;
         }
         if (this.cursors.down.isDown) {
-            this.weaponAngle -= this.weaponAngleSpeed * delta / 1000;
+            this.weaponAngle -= angleStep;
         }
         this.weaponAngle = Phaser.Math.Clamp(this.weaponAngle, this.weaponMinAngle, this.weaponMaxAngle);
         this.weapon.setPosition(this.player.x, this.player.y);
