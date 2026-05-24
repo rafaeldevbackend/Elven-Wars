@@ -5,7 +5,21 @@
   <meta charset="utf-8" />
   <title>Protótipo - Perjuangan Semut style</title>
   <script src="https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser.min.js"></script>
-  <style>body{margin:0;background:#222;color:#fff}#game{display:block;margin:0 auto}</style>
+  <style>
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: #222;
+      color: #fff;
+    }
+    #game {
+      display: block;
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+    }
+  </style>
 </head>
 <body>
   <div id="game"></div>
