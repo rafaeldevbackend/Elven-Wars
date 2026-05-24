@@ -35,6 +35,14 @@ class MainScene extends Phaser.Scene {
         this.cursors = this.input.keyboard.createCursorKeys();
         this.keys = this.input.keyboard.addKeys('A,D');
 
+        // ângulo da arma (bloco preto) — controlado pelas setas cima/baixo
+        this.weaponAngle = -Math.PI / 4;
+        this.weaponAngleSpeed = 2.5;
+        this.weaponMinAngle = -Math.PI + 0.1;
+        this.weaponMaxAngle = -0.1;
+        this.weapon = this.add.rectangle(this.player.x, this.player.y, 24, 8, 0x000000);
+        this.weapon.setOrigin(0, 0.5).setDepth(1);
+
         // eventos de carregamento e disparo do tiro
         this.chargeStart = 0;
         this.input.on('pointerdown', () => {
@@ -58,10 +66,16 @@ class MainScene extends Phaser.Scene {
         if (right) vx += 1;
         this.player.setVelocityX(vx * this.player.speed);
 
-        // mira para o ponteiro
-        const pointer = this.input.activePointer;
-        const angle = Phaser.Math.Angle.Between(this.player.x, this.player.y, pointer.worldX, pointer.worldY);
-        this.player.rotation = angle;
+        // ajuste de ângulo da arma pelas setas cima/baixo
+        if (this.cursors.up.isDown) {
+            this.weaponAngle += this.weaponAngleSpeed * delta / 1000;
+        }
+        if (this.cursors.down.isDown) {
+            this.weaponAngle -= this.weaponAngleSpeed * delta / 1000;
+        }
+        this.weaponAngle = Phaser.Math.Clamp(this.weaponAngle, this.weaponMinAngle, this.weaponMaxAngle);
+        this.weapon.setPosition(this.player.x, this.player.y);
+        this.weapon.setRotation(this.weaponAngle);
 
         // inimigos patrulham horizontalmente
         this.enemies.getChildren().forEach(e => {
@@ -87,7 +101,7 @@ class MainScene extends Phaser.Scene {
         const b = this.bullets.create(this.player.x, this.player.y, 'bullet');
         b.setActive(true).setVisible(true).setDepth(1);
 
-        const angle = this.player.rotation;
+        const angle = this.weaponAngle;
         b.body.setVelocity(Math.cos(angle) * speed, Math.sin(angle) * speed);
         b.body.allowGravity = true;
         b.setBounce(0.3);
