@@ -15,8 +15,12 @@ class MainScene extends Phaser.Scene {
         this.player.speed = 65;
         this.player.health = 100;
 
-        // controle de tiro único
-        this.canShoot = true;
+        // janela de 10 s: 1 tiro enquanto o timer não zerar; ao atirar ou zerar, reinicia
+        this.shootCooldownMs = 10000;
+        this.shootRestartDelayMs = 3000;
+        this.shootTimerRemaining = this.shootCooldownMs;
+        this.shootRestartDelayRemaining = 0;
+        this.hasShotThisInterval = false;
 
         // balas
         this.bullets = this.physics.add.group({ classType: Phaser.Physics.Arcade.Image, runChildUpdate: true });
@@ -56,6 +60,7 @@ class MainScene extends Phaser.Scene {
         // HUD
         this.hpText = this.add.text(10, 10, 'HP: ' + this.player.health, { font: '16px Arial', fill: '#fff' }).setScrollFactor(0);
         this.createAngleHud();
+        this.createShootTimerHud();
     }
 
     createAngleHud() {
@@ -79,14 +84,70 @@ class MainScene extends Phaser.Scene {
         this.angleHudText.setText('Ângulo: ' + angleDeg + '°');
     }
 
+    createShootTimerHud() {
+        this.shootTimerHud = this.add.text(
+            this.scale.width / 2,
+            75,
+            '',
+            {
+                font: '18px Arial',
+                fill: '#fff',
+                backgroundColor: '#000000aa',
+                padding: { x: 14, y: 8 }
+            }
+        ).setOrigin(0.5, 0).setScrollFactor(0).setDepth(10);
+        this.updateShootTimerHud();
+    }
+
+    isRoundActive() {
+        return this.shootRestartDelayRemaining <= 0 && this.shootTimerRemaining > 0;
+    }
+
+    shouldShowShootTimerHud() {
+        return this.isRoundActive();
+    }
+
+    updateShootTimerHud() {
+        if (!this.shouldShowShootTimerHud()) {
+            this.shootTimerHud.setVisible(false);
+            return;
+        }
+
+        const seconds = Math.max(1, Math.ceil(this.shootTimerRemaining / 1000));
+        this.shootTimerHud.setVisible(true);
+        this.shootTimerHud.setText(seconds + 's');
+    }
+
+    canShootNow() {
+        return this.shootRestartDelayRemaining <= 0
+            && !this.hasShotThisInterval
+            && this.shootTimerRemaining > 0;
+    }
+
+    startNewShootInterval() {
+        if (this.shootRestartDelayRemaining > 0) return;
+        this.shootRestartDelayRemaining = this.shootRestartDelayMs;
+        this.hasShotThisInterval = true;
+    }
+
+    activateShootInterval() {
+        this.shootTimerRemaining = this.shootCooldownMs;
+        this.shootRestartDelayRemaining = 0;
+        this.hasShotThisInterval = false;
+    }
+
     update(time, delta) {
-        // movimento lateral apenas
-        const left = this.cursors.left.isDown || this.keys.A.isDown;
-        const right = this.cursors.right.isDown || this.keys.D.isDown;
-        let vx = 0;
-        if (left) vx -= 1;
-        if (right) vx += 1;
-        this.player.setVelocityX(vx * this.player.speed);
+        // movimento lateral apenas durante a rodada ativa
+        if (this.isRoundActive()) {
+            const left = this.cursors.left.isDown || this.keys.A.isDown;
+            const right = this.cursors.right.isDown || this.keys.D.isDown;
+            let vx = 0;
+            if (left) vx -= 1;
+            if (right) vx += 1;
+            this.player.setVelocityX(vx * this.player.speed);
+        } else {
+            this.player.setVelocityX(0);
+        }
 
         // ajuste de ângulo da arma pelas setas cima/baixo
         const angleStep = Phaser.Math.DegToRad(this.weaponAngleSpeedDeg) * delta / 1000;
@@ -107,15 +168,29 @@ class MainScene extends Phaser.Scene {
             if (e.x > 760) { e.dir = -1; e.x = 760; }
         });
 
+        // delay de 3 s antes de cada reinício do timer
+        if (this.shootRestartDelayRemaining > 0) {
+            this.shootRestartDelayRemaining -= delta;
+            if (this.shootRestartDelayRemaining <= 0) {
+                this.activateShootInterval();
+            }
+        } else {
+            this.shootTimerRemaining -= delta;
+            if (this.shootTimerRemaining <= 0) {
+                this.startNewShootInterval();
+            }
+        }
+
         // atualizar HUD
         this.hpText.setText('HP: ' + Math.max(0, Math.round(this.player.health)));
         this.updateAngleHud();
+        this.updateShootTimerHud();
     }
 
     shoot(chargeTime) {
-        // impede múltiplos tiros simultâneos
-        if (!this.canShoot) return;
-        this.canShoot = false;
+        if (!this.canShootNow()) return;
+        this.hasShotThisInterval = true;
+        this.startNewShootInterval();
 
         const minSpeed = 200;
         const maxSpeed = 800;
@@ -133,7 +208,6 @@ class MainScene extends Phaser.Scene {
         // colisão com inimigos (mantém a destruição normal)
         this.physics.add.overlap(b, this.enemies, (bullet, enemy) => {
             bullet.destroy();
-            this.canShoot = true; // libera novo disparo
             enemy.health -= 15;
             this.tweens.add({
                 targets: enemy,
@@ -158,7 +232,6 @@ class MainScene extends Phaser.Scene {
                 b.y >= screenHeight - 10 // chão
             ) {
                 b.destroy();
-                this.canShoot = true; // libera novo tiro
             }
         };
     }
