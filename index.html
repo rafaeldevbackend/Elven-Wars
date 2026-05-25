@@ -12,6 +12,18 @@
       background: #222 url("assets/elven-wars-bg.png") center center / cover no-repeat;
       color: #fff;
     }
+    .logo-header {
+      display: flex;
+      justify-content: center;
+      padding: 1rem 1rem 0;
+      position: relative;
+      z-index: 1;
+    }
+    .logo-header img {
+      max-width: min(150px, 90vw);
+      height: auto;
+      display: block;
+    }
     #game {
       display: block;
       position: fixed;
@@ -22,6 +34,9 @@
   </style>
 </head>
 <body>
+  <header class="logo-header">
+    <img src="assets/elven-wars-logo.png" alt="Elven Wars" width="480" />
+  </header>
   <div id="game"></div>
   <script src="main.js"></script>
 </body>
