@@ -51,7 +51,7 @@ class MainScene extends Phaser.Scene {
         this.weapon.setOrigin(0, 0.5).setDepth(1);
 
         // eventos de carregamento e disparo do tiro
-        this.maxChargeMs = 1000;
+        this.maxChargeMs = 5000;
         this.chargeStart = 0;
         this.isCharging = false;
         this.input.on('pointerdown', () => {
