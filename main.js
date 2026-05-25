@@ -50,16 +50,17 @@ class MainScene extends Phaser.Scene {
         this.weapon = this.add.rectangle(this.player.x, this.player.y, 24, 8, 0x000000);
         this.weapon.setOrigin(0, 0.5).setDepth(1);
 
-        // eventos de carregamento e disparo do tiro
+        // carregamento e disparo do tiro (tecla Espaço)
         this.maxChargeMs = 5000;
         this.chargeStart = 0;
         this.isCharging = false;
-        this.input.on('pointerdown', () => {
-            if (!this.canShootNow()) return;
+        this.spaceKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
+        this.input.keyboard.on('keydown-SPACE', () => {
+            if (this.isCharging || !this.canShootNow()) return;
             this.chargeStart = this.time.now;
             this.isCharging = true;
         });
-        this.input.on('pointerup', () => {
+        this.input.keyboard.on('keyup-SPACE', () => {
             if (!this.isCharging) return;
             const chargeTime = this.time.now - this.chargeStart;
             this.isCharging = false;
