@@ -51,12 +51,18 @@ class MainScene extends Phaser.Scene {
         this.weapon.setOrigin(0, 0.5).setDepth(1);
 
         // eventos de carregamento e disparo do tiro
+        this.maxChargeMs = 1000;
         this.chargeStart = 0;
+        this.isCharging = false;
         this.input.on('pointerdown', () => {
+            if (!this.canShootNow()) return;
             this.chargeStart = this.time.now;
+            this.isCharging = true;
         });
         this.input.on('pointerup', () => {
+            if (!this.isCharging) return;
             const chargeTime = this.time.now - this.chargeStart;
+            this.isCharging = false;
             this.shoot(chargeTime);
         });
 
@@ -64,6 +70,7 @@ class MainScene extends Phaser.Scene {
         this.hpText = this.add.text(10, 10, 'HP: ' + this.player.health, { font: '16px Arial', fill: '#fff' }).setScrollFactor(0);
         this.createAngleHud();
         this.createShootTimerHud();
+        this.createForceHud();
     }
 
     createAngleHud() {
@@ -145,6 +152,63 @@ class MainScene extends Phaser.Scene {
         this.shootTimerHud.setText(seconds + 's');
     }
 
+    createForceHud() {
+        const barWidth = 220;
+        const barHeight = 18;
+        const centerX = this.scale.width / 2;
+        const centerY = this.scale.height - 36;
+
+        this.forceHudBarWidth = barWidth - 4;
+        this.forceHudCenterX = centerX;
+        this.forceHudY = centerY;
+
+        this.forceHudBg = this.add.rectangle(centerX, centerY, barWidth, barHeight, 0x1a1a1a, 0.9)
+            .setStrokeStyle(2, 0xffffff, 0.35)
+            .setScrollFactor(0)
+            .setDepth(10);
+
+        this.forceHudFill = this.add.rectangle(
+            centerX - this.forceHudBarWidth / 2,
+            centerY,
+            0,
+            barHeight - 4,
+            0x3ecf6e
+        ).setOrigin(0, 0.5).setScrollFactor(0).setDepth(11);
+
+        this.forceHudText = this.add.text(centerX, centerY - 22, 'Força: 0', {
+            font: '14px Arial',
+            fill: '#fff',
+            backgroundColor: '#000000aa',
+            padding: { x: 8, y: 4 }
+        }).setOrigin(0.5, 0.5).setScrollFactor(0).setDepth(10);
+
+        this.updateForceHud();
+    }
+
+    getChargeForcePercent() {
+        if (!this.isCharging) return 0;
+        const chargeTime = this.time.now - this.chargeStart;
+        return Math.round(Phaser.Math.Clamp(chargeTime / this.maxChargeMs, 0, 1) * 100);
+    }
+
+    updateForceHud() {
+        const show = this.canShootNow() || this.isCharging;
+        this.forceHudBg.setVisible(show);
+        this.forceHudFill.setVisible(show);
+        this.forceHudText.setVisible(show);
+        if (!show) return;
+
+        const force = this.getChargeForcePercent();
+        this.forceHudFill.width = (force / 100) * this.forceHudBarWidth;
+        this.forceHudText.setText('Força: ' + force);
+
+        const t = force / 100;
+        const r = Math.round(Phaser.Math.Linear(62, 231, t));
+        const g = Math.round(Phaser.Math.Linear(207, 76, t));
+        const b = Math.round(Phaser.Math.Linear(110, 60, t));
+        this.forceHudFill.setFillStyle(Phaser.Display.Color.GetColor(r, g, b));
+    }
+
     canShootNow() {
         return this.shootRestartDelayRemaining <= 0
             && !this.hasShotThisInterval
@@ -212,6 +276,7 @@ class MainScene extends Phaser.Scene {
         this.hpText.setText('HP: ' + Math.max(0, Math.round(this.player.health)));
         this.updateAngleHud();
         this.updateShootTimerHud();
+        this.updateForceHud();
     }
 
     shoot(chargeTime) {
@@ -222,7 +287,7 @@ class MainScene extends Phaser.Scene {
 
         const minSpeed = 200;
         const maxSpeed = 800;
-        const charge = Phaser.Math.Clamp(chargeTime / 1000, 0, 1);
+        const charge = Phaser.Math.Clamp(chargeTime / this.maxChargeMs, 0, 1);
         const speed = minSpeed + (maxSpeed - minSpeed) * charge;
 
         const b = this.bullets.create(this.player.x, this.player.y, 'bullet');
