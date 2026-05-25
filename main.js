@@ -57,6 +57,7 @@ class MainScene extends Phaser.Scene {
         this.spaceKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
         this.input.keyboard.on('keydown-SPACE', () => {
             if (this.isCharging || !this.canShootNow()) return;
+            this.frozenShootTimerSeconds = Math.max(1, Math.ceil(this.shootTimerRemaining / 1000));
             this.chargeStart = this.time.now;
             this.isCharging = true;
         });
@@ -137,7 +138,11 @@ class MainScene extends Phaser.Scene {
     }
 
     shouldShowShootTimerHud() {
-        return this.isRoundActive() || !!this.playerBullet;
+        return this.isRoundActive() || this.isCharging || !!this.playerBullet;
+    }
+
+    isShootTimerFrozen() {
+        return this.isCharging || !!this.playerBullet;
     }
 
     updateShootTimerHud() {
@@ -146,7 +151,7 @@ class MainScene extends Phaser.Scene {
             return;
         }
 
-        const seconds = this.playerBullet
+        const seconds = this.isShootTimerFrozen()
             ? this.frozenShootTimerSeconds
             : Math.max(1, Math.ceil(this.shootTimerRemaining / 1000));
         this.shootTimerHud.setVisible(true);
@@ -266,7 +271,7 @@ class MainScene extends Phaser.Scene {
             if (this.shootRestartDelayRemaining <= 0) {
                 this.activateShootInterval();
             }
-        } else if (!this.playerBullet) {
+        } else if (!this.isShootTimerFrozen()) {
             this.shootTimerRemaining -= delta;
             if (this.shootTimerRemaining <= 0) {
                 this.requestRoundRestart();
