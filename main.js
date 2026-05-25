@@ -300,10 +300,14 @@ class MainScene extends Phaser.Scene {
         b.setActive(true).setVisible(true).setDepth(1);
         this.playerBullet = b;
 
+        b.launchX = this.player.x;
+        b.launchY = this.player.y;
+        b.hasBeenAboveLaunch = false;
+
         const angle = this.weaponAngle;
         b.body.setVelocity(Math.cos(angle) * speed, Math.sin(angle) * speed);
         b.body.allowGravity = true;
-        b.setBounce(0.3);
+        b.setBounce(0);
 
         this.physics.add.overlap(b, this.enemies, (bullet, enemy) => {
             this.destroyPlayerBullet(bullet);
@@ -320,14 +324,22 @@ class MainScene extends Phaser.Scene {
 
         b.update = () => {
             const screenWidth = this.scale.width;
-            const screenHeight = this.scale.height;
+
+            if (b.x < 0 || b.x > screenWidth) {
+                this.destroyPlayerBullet(b);
+                return;
+            }
+
+            if (b.y < b.launchY) {
+                b.hasBeenAboveLaunch = true;
+            }
 
             if (
-                b.y < 0 ||
-                b.x < 0 ||
-                b.x > screenWidth ||
-                b.y >= screenHeight - 10
+                b.hasBeenAboveLaunch &&
+                b.body.velocity.y > 0 &&
+                b.y >= b.launchY
             ) {
+                b.setPosition(b.launchX, b.launchY);
                 this.destroyPlayerBullet(b);
             }
         };
