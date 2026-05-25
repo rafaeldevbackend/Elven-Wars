@@ -44,7 +44,7 @@ class MainScene extends Phaser.Scene {
 
         // ângulo da arma (bloco preto) — controlado pelas setas cima/baixo
         this.weaponAngle = -Math.PI / 4;
-        this.weaponAngleSpeedDeg = 65;
+        this.weaponAngleSpeedDeg = 13;
         this.weaponMinAngle = -Math.PI + 0.1;
         this.weaponMaxAngle = -0.1;
         this.weapon = this.add.rectangle(this.player.x, this.player.y, 24, 8, 0x000000);
