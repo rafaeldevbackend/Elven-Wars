@@ -21,6 +21,9 @@ class MainScene extends Phaser.Scene {
         this.shootTimerRemaining = this.shootCooldownMs;
         this.shootRestartDelayRemaining = 0;
         this.hasShotThisInterval = false;
+        this.playerBullet = null;
+        this.pendingRoundRestart = false;
+        this.frozenShootTimerSeconds = 0;
 
         // balas
         this.bullets = this.physics.add.group({ classType: Phaser.Physics.Arcade.Image, runChildUpdate: true });
@@ -100,11 +103,33 @@ class MainScene extends Phaser.Scene {
     }
 
     isRoundActive() {
-        return this.shootRestartDelayRemaining <= 0 && this.shootTimerRemaining > 0;
+        return this.shootRestartDelayRemaining <= 0
+            && this.shootTimerRemaining > 0
+            && !this.playerBullet;
+    }
+
+    destroyPlayerBullet(bullet) {
+        if (this.playerBullet !== bullet) return;
+
+        this.playerBullet = null;
+        bullet.destroy();
+
+        if (this.pendingRoundRestart) {
+            this.pendingRoundRestart = false;
+            this.startNewShootInterval();
+        }
+    }
+
+    requestRoundRestart() {
+        if (this.playerBullet) {
+            this.pendingRoundRestart = true;
+            return;
+        }
+        this.startNewShootInterval();
     }
 
     shouldShowShootTimerHud() {
-        return this.isRoundActive();
+        return this.isRoundActive() || !!this.playerBullet;
     }
 
     updateShootTimerHud() {
@@ -113,7 +138,9 @@ class MainScene extends Phaser.Scene {
             return;
         }
 
-        const seconds = Math.max(1, Math.ceil(this.shootTimerRemaining / 1000));
+        const seconds = this.playerBullet
+            ? this.frozenShootTimerSeconds
+            : Math.max(1, Math.ceil(this.shootTimerRemaining / 1000));
         this.shootTimerHud.setVisible(true);
         this.shootTimerHud.setText(seconds + 's');
     }
@@ -174,10 +201,10 @@ class MainScene extends Phaser.Scene {
             if (this.shootRestartDelayRemaining <= 0) {
                 this.activateShootInterval();
             }
-        } else {
+        } else if (!this.playerBullet) {
             this.shootTimerRemaining -= delta;
             if (this.shootTimerRemaining <= 0) {
-                this.startNewShootInterval();
+                this.requestRoundRestart();
             }
         }
 
@@ -190,7 +217,8 @@ class MainScene extends Phaser.Scene {
     shoot(chargeTime) {
         if (!this.canShootNow()) return;
         this.hasShotThisInterval = true;
-        this.startNewShootInterval();
+        this.pendingRoundRestart = true;
+        this.frozenShootTimerSeconds = Math.max(1, Math.ceil(this.shootTimerRemaining / 1000));
 
         const minSpeed = 200;
         const maxSpeed = 800;
@@ -199,15 +227,15 @@ class MainScene extends Phaser.Scene {
 
         const b = this.bullets.create(this.player.x, this.player.y, 'bullet');
         b.setActive(true).setVisible(true).setDepth(1);
+        this.playerBullet = b;
 
         const angle = this.weaponAngle;
         b.body.setVelocity(Math.cos(angle) * speed, Math.sin(angle) * speed);
         b.body.allowGravity = true;
         b.setBounce(0.3);
 
-        // colisão com inimigos (mantém a destruição normal)
         this.physics.add.overlap(b, this.enemies, (bullet, enemy) => {
-            bullet.destroy();
+            this.destroyPlayerBullet(bullet);
             enemy.health -= 15;
             this.tweens.add({
                 targets: enemy,
@@ -219,19 +247,17 @@ class MainScene extends Phaser.Scene {
             if (enemy.health <= 0) enemy.destroy();
         });
 
-        // verificação contínua de limite de tela e chão
         b.update = () => {
             const screenWidth = this.scale.width;
             const screenHeight = this.scale.height;
 
-            // destrói se sair da tela
             if (
-                b.y < 0 || // acima
-                b.x < 0 || // esquerda
-                b.x > screenWidth || // direita
-                b.y >= screenHeight - 10 // chão
+                b.y < 0 ||
+                b.x < 0 ||
+                b.x > screenWidth ||
+                b.y >= screenHeight - 10
             ) {
-                b.destroy();
+                this.destroyPlayerBullet(b);
             }
         };
     }
