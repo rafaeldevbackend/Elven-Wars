@@ -44,9 +44,9 @@ class MainScene extends Phaser.Scene {
 
         // controles
         this.cursors = this.input.keyboard.createCursorKeys();
-        this.keys = this.input.keyboard.addKeys('A,D');
+        this.keys = this.input.keyboard.addKeys('A,D,W,S');
 
-        // ângulo da arma (bloco preto) — controlado pelas setas cima/baixo
+        // ângulo da arma (bloco preto) — setas/W/S cima/baixo
         this.weaponAngle = -Math.PI / 4;
         this.weaponAngleSpeedDeg = 13;
         this.weaponMinAngle = -Math.PI + 0.1;
@@ -268,13 +268,15 @@ class MainScene extends Phaser.Scene {
             this.player.setVelocityX(0);
         }
 
-        // ajuste de ângulo da arma pelas setas cima/baixo
+        // ajuste de ângulo: cima/W sobem o ângulo; baixo/S descem
         const angleStep = Phaser.Math.DegToRad(this.weaponAngleSpeedDeg) * delta / 1000;
-        if (this.cursors.up.isDown) {
-            this.weaponAngle += angleStep;
-        }
-        if (this.cursors.down.isDown) {
+        const angleUp = this.cursors.up.isDown || this.keys.W.isDown;
+        const angleDown = this.cursors.down.isDown || this.keys.S.isDown;
+        if (angleUp && !angleDown) {
             this.weaponAngle -= angleStep;
+        }
+        if (angleDown && !angleUp) {
+            this.weaponAngle += angleStep;
         }
         this.weaponAngle = Phaser.Math.Clamp(this.weaponAngle, this.weaponMinAngle, this.weaponMaxAngle);
         this.weapon.setPosition(this.player.x, this.player.y);
