@@ -15,6 +15,10 @@ class MainScene extends Phaser.Scene {
         this.player.speed = 65;
         this.player.health = 100;
 
+        // 1 = virado para direita (azul), -1 = virado para esquerda (vermelho)
+        this.facing = 1;
+        this.applyPlayerFacing();
+
         // janela de 10 s: 1 tiro enquanto o timer não zerar; ao atirar ou zerar, reinicia
         this.shootCooldownMs = 10000;
         this.shootRestartDelayMs = 3000;
@@ -93,7 +97,17 @@ class MainScene extends Phaser.Scene {
 
     updateAngleHud() {
         const angleDeg = Math.round(Phaser.Math.RadToDeg(-this.weaponAngle));
-        this.angleHudText.setText('Ângulo: ' + angleDeg + '°');
+        const facingLabel = this.facing === -1 ? 'Esq.' : 'Dir.';
+        this.angleHudText.setText('Ângulo: ' + angleDeg + '° (' + facingLabel + ')');
+    }
+
+    applyPlayerFacing() {
+        this.player.setFlipX(this.facing === -1);
+        this.player.setTint(this.facing === -1 ? 0xff3333 : 0x3366ff);
+    }
+
+    getWeaponDisplayRotation() {
+        return this.facing === -1 ? Math.PI - this.weaponAngle : this.weaponAngle;
     }
 
     createShootTimerHud() {
@@ -234,13 +248,21 @@ class MainScene extends Phaser.Scene {
     }
 
     update(time, delta) {
+        const left = this.cursors.left.isDown || this.keys.A.isDown;
+        const right = this.cursors.right.isDown || this.keys.D.isDown;
+
+        if (left && !right) {
+            this.facing = -1;
+        } else if (right && !left) {
+            this.facing = 1;
+        }
+        this.applyPlayerFacing();
+
         // movimento lateral apenas durante a rodada ativa
         if (this.isRoundActive()) {
-            const left = this.cursors.left.isDown || this.keys.A.isDown;
-            const right = this.cursors.right.isDown || this.keys.D.isDown;
             let vx = 0;
-            if (left) vx -= 1;
-            if (right) vx += 1;
+            if (left && !right) vx -= 1;
+            if (right && !left) vx += 1;
             this.player.setVelocityX(vx * this.player.speed);
         } else {
             this.player.setVelocityX(0);
@@ -256,7 +278,7 @@ class MainScene extends Phaser.Scene {
         }
         this.weaponAngle = Phaser.Math.Clamp(this.weaponAngle, this.weaponMinAngle, this.weaponMaxAngle);
         this.weapon.setPosition(this.player.x, this.player.y);
-        this.weapon.setRotation(this.weaponAngle);
+        this.weapon.setRotation(this.getWeaponDisplayRotation());
 
         // inimigos patrulham horizontalmente
         this.enemies.getChildren().forEach(e => {
@@ -305,7 +327,10 @@ class MainScene extends Phaser.Scene {
         b.hasBeenAboveLaunch = false;
 
         const angle = this.weaponAngle;
-        b.body.setVelocity(Math.cos(angle) * speed, Math.sin(angle) * speed);
+        b.body.setVelocity(
+            Math.cos(angle) * speed * this.facing,
+            Math.sin(angle) * speed
+        );
         b.body.allowGravity = true;
         b.setBounce(0);
 
