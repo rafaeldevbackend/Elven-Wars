@@ -24,7 +24,8 @@ class MainScene extends Phaser.Scene {
         const spawnY = this.worldHeight - 60;
         this.player = this.physics.add.sprite(spawnX, spawnY, 'ant').setScale(2);
         this.player.setCollideWorldBounds(true);
-        this.cameras.main.startFollow(this.player, true, 0.12, 0);
+        this.cameraFollowsBullet = false;
+        this.focusPlayerCamera();
         this.player.speed = 65;
         this.player.health = 100;
 
@@ -121,6 +122,42 @@ class MainScene extends Phaser.Scene {
         this.player.setTint(this.facing === -1 ? 0xff3333 : 0x3366ff);
     }
 
+    hasMapScrollRoom() {
+        const cam = this.cameras.main;
+        return cam.width < this.worldWidth || cam.height < this.worldHeight;
+    }
+
+    focusPlayerCamera() {
+        this.cameraFollowsBullet = false;
+        this.cameras.main.stopFollow();
+        this.cameras.main.startFollow(this.player, true, 0.12, 0);
+    }
+
+    focusBulletCamera() {
+        if (!this.hasMapScrollRoom()) return;
+        this.cameraFollowsBullet = true;
+        this.cameras.main.stopFollow();
+    }
+
+    updateCamera(delta) {
+        if (!this.cameraFollowsBullet || !this.playerBullet) return;
+
+        const cam = this.cameras.main;
+        const bullet = this.playerBullet;
+        const maxScrollX = Math.max(0, this.worldWidth - cam.width);
+        const maxScrollY = Math.max(0, this.worldHeight - cam.height);
+        const lerp = Phaser.Math.Clamp(delta / 80, 0.05, 0.25);
+
+        if (maxScrollX > 0) {
+            const targetX = Phaser.Math.Clamp(bullet.x - cam.width / 2, 0, maxScrollX);
+            cam.scrollX = Phaser.Math.Linear(cam.scrollX, targetX, lerp);
+        }
+        if (maxScrollY > 0) {
+            const targetY = Phaser.Math.Clamp(bullet.y - cam.height / 2, 0, maxScrollY);
+            cam.scrollY = Phaser.Math.Linear(cam.scrollY, targetY, lerp);
+        }
+    }
+
     getWeaponDisplayRotation() {
         return this.facing === -1 ? Math.PI - this.weaponAngle : this.weaponAngle;
     }
@@ -151,6 +188,7 @@ class MainScene extends Phaser.Scene {
 
         this.playerBullet = null;
         bullet.destroy();
+        this.focusPlayerCamera();
 
         if (this.pendingRoundRestart) {
             this.pendingRoundRestart = false;
@@ -322,6 +360,8 @@ class MainScene extends Phaser.Scene {
             }
         }
 
+        this.updateCamera(delta);
+
         // atualizar HUD
         this.hpText.setText('HP: ' + Math.max(0, Math.round(this.player.health)));
         this.updateAngleHud();
@@ -356,6 +396,7 @@ class MainScene extends Phaser.Scene {
         );
         b.body.allowGravity = true;
         b.setBounce(0);
+        this.focusBulletCamera();
 
         this.physics.add.overlap(b, this.enemies, (bullet, enemy) => {
             this.destroyPlayerBullet(bullet);
