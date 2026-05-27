@@ -1,17 +1,30 @@
 class MainScene extends Phaser.Scene {
 
     preload() {
-        this.load.image('bg', './assets/bg.png');
+        this.load.image('vilaBg', './assets/maps/vila-elfica/vila-élfica-bg.png');
         this.textures.generate('ant', { data: ['..###..', '..###..', '..###..'], pixelWidth: 6 });
         this.load.image('bullet', './assets/bullet.png');
     }
 
     create() {
-        this.cameras.main.setBackgroundColor('#2b2b2b');
+        const mapTex = this.textures.get('vilaBg').getSourceImage();
+        this.worldWidth = mapTex.width;
+        this.worldHeight = mapTex.height;
+
+        this.physics.world.setBounds(0, 0, this.worldWidth, this.worldHeight);
+
+        const bg = this.add.image(this.worldWidth / 2, this.worldHeight / 2, 'vilaBg');
+        bg.setDepth(-100);
+
+        this.cameras.main.setBounds(0, 0, this.worldWidth, this.worldHeight);
+        this.cameras.main.setBackgroundColor('#1a2a1a');
 
         // jogador nasce na parte inferior do mapa
-        this.player = this.physics.add.sprite(400, 580, 'ant').setScale(2);
+        const spawnX = this.worldWidth / 2;
+        const spawnY = this.worldHeight - 60;
+        this.player = this.physics.add.sprite(spawnX, spawnY, 'ant').setScale(2);
         this.player.setCollideWorldBounds(true);
+        this.cameras.main.startFollow(this.player, true, 0.12, 0);
         this.player.speed = 65;
         this.player.health = 100;
 
@@ -35,7 +48,8 @@ class MainScene extends Phaser.Scene {
         // inimigos
         this.enemies = this.physics.add.group();
         for (let i = 0; i < 6; i++) {
-            const e = this.enemies.create(100 + i * 110, 80 + (i % 2) * 120, 'ant').setScale(1.6);
+            const x = (this.worldWidth / 7) * (i + 1);
+            const e = this.enemies.create(x, 80 + (i % 2) * 120, 'ant').setScale(1.6);
             e.setTint(0xff6666);
             e.health = 30;
             e.speed = 40 + Math.random() * 60;
@@ -58,6 +72,7 @@ class MainScene extends Phaser.Scene {
         this.maxChargeMs = 5000;
         this.chargeStart = 0;
         this.isCharging = false;
+        this.lastRoundForcePercent = 0;
         this.spaceKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
         this.input.keyboard.on('keydown-SPACE', () => {
             if (this.isCharging || !this.canShootNow()) return;
@@ -144,6 +159,9 @@ class MainScene extends Phaser.Scene {
     }
 
     requestRoundRestart() {
+        if (!this.hasShotThisInterval) {
+            this.lastRoundForcePercent = 0;
+        }
         if (this.playerBullet) {
             this.pendingRoundRestart = true;
             return;
@@ -205,20 +223,22 @@ class MainScene extends Phaser.Scene {
         this.updateForceHud();
     }
 
-    getChargeForcePercent() {
-        if (!this.isCharging) return 0;
-        const chargeTime = this.time.now - this.chargeStart;
+    chargeTimeToForcePercent(chargeTime) {
         return Math.round(Phaser.Math.Clamp(chargeTime / this.maxChargeMs, 0, 1) * 100);
     }
 
-    updateForceHud() {
-        const show = this.canShootNow() || this.isCharging;
-        this.forceHudBg.setVisible(show);
-        this.forceHudFill.setVisible(show);
-        this.forceHudText.setVisible(show);
-        if (!show) return;
+    getChargeForcePercent() {
+        if (!this.isCharging) return 0;
+        return this.chargeTimeToForcePercent(this.time.now - this.chargeStart);
+    }
 
-        const force = this.getChargeForcePercent();
+    getDisplayForcePercent() {
+        if (this.isCharging) return this.getChargeForcePercent();
+        return this.lastRoundForcePercent;
+    }
+
+    updateForceHud() {
+        const force = this.getDisplayForcePercent();
         this.forceHudFill.width = (force / 100) * this.forceHudBarWidth;
         this.forceHudText.setText('Força: ' + force);
 
@@ -286,7 +306,7 @@ class MainScene extends Phaser.Scene {
         this.enemies.getChildren().forEach(e => {
             e.x += e.dir * e.speed * delta / 1000;
             if (e.x < 40) { e.dir = 1; e.x = 40; }
-            if (e.x > 760) { e.dir = -1; e.x = 760; }
+            if (e.x > this.worldWidth - 40) { e.dir = -1; e.x = this.worldWidth - 40; }
         });
 
         // delay de 3 s antes de cada reinício do timer
@@ -318,6 +338,7 @@ class MainScene extends Phaser.Scene {
         const minSpeed = 200;
         const maxSpeed = 800;
         const charge = Phaser.Math.Clamp(chargeTime / this.maxChargeMs, 0, 1);
+        this.lastRoundForcePercent = this.chargeTimeToForcePercent(chargeTime);
         const speed = minSpeed + (maxSpeed - minSpeed) * charge;
 
         const b = this.bullets.create(this.player.x, this.player.y, 'bullet');
@@ -350,9 +371,7 @@ class MainScene extends Phaser.Scene {
         });
 
         b.update = () => {
-            const screenWidth = this.scale.width;
-
-            if (b.x < 0 || b.x > screenWidth) {
+            if (b.x < 0 || b.x > this.worldWidth || b.y < 0 || b.y > this.worldHeight) {
                 this.destroyPlayerBullet(b);
                 return;
             }
