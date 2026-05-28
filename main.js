@@ -75,24 +75,109 @@ class MainScene extends Phaser.Scene {
         this.isCharging = false;
         this.lastRoundForcePercent = 0;
         this.spaceKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
-        this.input.keyboard.on('keydown-SPACE', () => {
-            if (this.isCharging || !this.canShootNow()) return;
-            this.frozenShootTimerSeconds = Math.max(1, Math.ceil(this.shootTimerRemaining / 1000));
-            this.chargeStart = this.time.now;
-            this.isCharging = true;
-        });
-        this.input.keyboard.on('keyup-SPACE', () => {
-            if (!this.isCharging) return;
-            const chargeTime = this.time.now - this.chargeStart;
-            this.isCharging = false;
-            this.shoot(chargeTime);
-        });
+        this.input.keyboard.on('keydown-SPACE', () => this.beginCharge());
+        this.input.keyboard.on('keyup-SPACE', () => this.endCharge());
 
         // HUD
         this.hpText = this.add.text(10, 10, 'HP: ' + this.player.health, { font: '16px Arial', fill: '#fff' }).setScrollFactor(0);
         this.createAngleHud();
         this.createShootTimerHud();
         this.createForceHud();
+        this.createControlHud();
+    }
+
+    beginCharge() {
+        if (this.isCharging || !this.canShootNow()) return;
+        this.frozenShootTimerSeconds = Math.max(1, Math.ceil(this.shootTimerRemaining / 1000));
+        this.chargeStart = this.time.now;
+        this.isCharging = true;
+        if (this.shootHudBtn) this.shootHudBtn.setFillStyle(0xff6666, 0.55);
+    }
+
+    endCharge() {
+        if (!this.isCharging) return;
+        const chargeTime = this.time.now - this.chargeStart;
+        this.isCharging = false;
+        if (this.shootHudBtn) this.shootHudBtn.setFillStyle(0xcc3333, 0.4);
+        this.shoot(chargeTime);
+    }
+
+    createControlHud() {
+        const depth = 25;
+        const btnRadius = 34;
+        const gap = 76;
+        const margin = 88;
+        const baseY = this.scale.height - margin;
+
+        this.touchControls = { up: false, right: false, down: false, left: false };
+
+        const dpad = [
+            { key: 'up', x: 0, y: -gap, label: '▲' },
+            { key: 'right', x: gap, y: 0, label: '▶' },
+            { key: 'down', x: 0, y: gap, label: '▼' },
+            { key: 'left', x: -gap, y: 0, label: '◀' }
+        ];
+
+        const dpadX = margin;
+        const dpadY = baseY;
+
+        dpad.forEach(({ key, x, y, label }) => {
+            const bx = dpadX + x;
+            const by = dpadY + y;
+            const btn = this.add.circle(bx, by, btnRadius, 0xffffff, 0.18)
+                .setStrokeStyle(2, 0xffffff, 0.45)
+                .setScrollFactor(0)
+                .setDepth(depth)
+                .setInteractive({ useHandCursor: true });
+
+            this.add.text(bx, by, label, {
+                font: '22px Arial',
+                fill: '#ffffff'
+            }).setOrigin(0.5).setScrollFactor(0).setDepth(depth + 1);
+
+            const press = () => {
+                this.touchControls[key] = true;
+                btn.setFillStyle(0xffffff, 0.42);
+            };
+            const release = () => {
+                this.touchControls[key] = false;
+                btn.setFillStyle(0xffffff, 0.18);
+            };
+
+            btn.on('pointerdown', press);
+            btn.on('pointerup', release);
+            btn.on('pointerout', release);
+        });
+
+        const shootX = this.scale.width - margin;
+        const shootY = baseY;
+        const shootRadius = 48;
+
+        this.shootHudBtn = this.add.circle(shootX, shootY, shootRadius, 0xcc3333, 0.4)
+            .setStrokeStyle(3, 0xffffff, 0.5)
+            .setScrollFactor(0)
+            .setDepth(depth)
+            .setInteractive({ useHandCursor: true });
+
+        this.add.image(shootX, shootY, 'bullet')
+            .setScale(1.4)
+            .setScrollFactor(0)
+            .setDepth(depth + 1);
+
+        this.shootHudBtn.on('pointerdown', () => this.beginCharge());
+        this.shootHudBtn.on('pointerup', () => this.endCharge());
+        this.shootHudBtn.on('pointerout', () => {
+            if (this.isCharging) this.endCharge();
+        });
+    }
+
+    isDirectionHeld(dir) {
+        if (this.touchControls[dir]) return true;
+        if (dir === 'left') return this.cursors.left.isDown || this.keys.A.isDown;
+        if (dir === 'right') return this.cursors.right.isDown || this.keys.D.isDown;
+        if (dir === 'up') return this.cursors.up.isDown || this.keys.W.isDown;
+        if (dir === 'down') return this.cursors.down.isDown || this.keys.S.isDown;
+        return false;
     }
 
     createAngleHud() {
@@ -306,8 +391,8 @@ class MainScene extends Phaser.Scene {
     }
 
     update(time, delta) {
-        const left = this.cursors.left.isDown || this.keys.A.isDown;
-        const right = this.cursors.right.isDown || this.keys.D.isDown;
+        const left = this.isDirectionHeld('left');
+        const right = this.isDirectionHeld('right');
 
         if (left && !right) {
             this.facing = -1;
@@ -328,8 +413,8 @@ class MainScene extends Phaser.Scene {
 
         // ajuste de ângulo: cima/W sobem o ângulo; baixo/S descem
         const angleStep = Phaser.Math.DegToRad(this.weaponAngleSpeedDeg) * delta / 1000;
-        const angleUp = this.cursors.up.isDown || this.keys.W.isDown;
-        const angleDown = this.cursors.down.isDown || this.keys.S.isDown;
+        const angleUp = this.isDirectionHeld('up');
+        const angleDown = this.isDirectionHeld('down');
         if (angleUp && !angleDown) {
             this.weaponAngle -= angleStep;
         }
