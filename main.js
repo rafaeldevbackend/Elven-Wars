@@ -316,12 +316,13 @@ class MainScene extends Phaser.Scene {
     }
 
     createForceHud() {
-        const barWidth = 220;
-        const barHeight = 18;
+        const barWidth = 518;
+        const barHeight = 39;
+        const barInset = 6;
         const centerX = this.scale.width / 2;
         const centerY = this.scale.height - this.hudBottomPad - barHeight / 2;
 
-        this.forceHudBarWidth = barWidth - 4;
+        this.forceHudBarWidth = barWidth - barInset;
         this.forceHudCenterX = centerX;
         this.forceHudY = centerY;
 
@@ -334,15 +335,15 @@ class MainScene extends Phaser.Scene {
             centerX - this.forceHudBarWidth / 2,
             centerY,
             0,
-            barHeight - 4,
+            barHeight - barInset,
             0x3ecf6e
         ).setOrigin(0, 0.5).setScrollFactor(0).setDepth(11);
 
-        this.forceHudText = this.add.text(centerX, centerY - 22, 'Força: 0', {
-            font: '14px Arial',
+        this.forceHudText = this.add.text(centerX, centerY - 45, 'Força: 0', {
+            font: '24px Arial',
             fill: '#fff',
             backgroundColor: '#000000aa',
-            padding: { x: 8, y: 4 }
+            padding: { x: 12, y: 6 }
         }).setOrigin(0.5, 0.5).setScrollFactor(0).setDepth(10);
 
         this.updateForceHud();
