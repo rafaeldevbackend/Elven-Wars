@@ -78,7 +78,8 @@ class MainScene extends Phaser.Scene {
         this.input.keyboard.on('keydown-SPACE', () => this.beginCharge());
         this.input.keyboard.on('keyup-SPACE', () => this.endCharge());
 
-        // HUD
+        // HUD (distância da borda inferior da tela)
+        this.hudBottomPad = 45;
         this.hpText = this.add.text(10, 10, 'HP: ' + this.player.health, { font: '16px Arial', fill: '#fff' }).setScrollFactor(0);
         this.createAngleHud();
         this.createShootTimerHud();
@@ -111,7 +112,8 @@ class MainScene extends Phaser.Scene {
         const dpadExtent = gap + btnRadius;
 
         const dpadX = pad + dpadExtent;
-        const dpadY = this.scale.height - pad - dpadExtent - 28;
+        const bottomPad = this.hudBottomPad;
+        const dpadY = this.scale.height - bottomPad - gap - btnRadius;
 
         this.touchControls = { up: false, right: false, down: false, left: false };
 
@@ -151,7 +153,7 @@ class MainScene extends Phaser.Scene {
         });
 
         const shootX = this.scale.width - pad - shootRadius;
-        const shootY = dpadY;
+        const shootY = this.scale.height - bottomPad - shootRadius;
 
         this.shootHudBtn = this.add.circle(shootX, shootY, shootRadius, 0xcc3333, 0.4)
             .setStrokeStyle(3, 0xffffff, 0.5)
@@ -317,7 +319,7 @@ class MainScene extends Phaser.Scene {
         const barWidth = 220;
         const barHeight = 18;
         const centerX = this.scale.width / 2;
-        const centerY = this.scale.height - 36;
+        const centerY = this.scale.height - this.hudBottomPad - barHeight / 2;
 
         this.forceHudBarWidth = barWidth - 4;
         this.forceHudCenterX = centerX;
