@@ -104,10 +104,14 @@ class MainScene extends Phaser.Scene {
 
     createControlHud() {
         const depth = 25;
-        const btnRadius = 34;
-        const gap = 76;
-        const margin = 88;
-        const baseY = this.scale.height - margin;
+        const pad = 24;
+        const btnRadius = Math.round(34 * 0.85);
+        const gap = Math.round(76 * 0.85);
+        const shootRadius = Math.round(48 * 0.85);
+        const dpadExtent = gap + btnRadius;
+
+        const dpadX = pad + dpadExtent;
+        const dpadY = this.scale.height - pad - dpadExtent - 28;
 
         this.touchControls = { up: false, right: false, down: false, left: false };
 
@@ -117,9 +121,6 @@ class MainScene extends Phaser.Scene {
             { key: 'down', x: 0, y: gap, label: '▼' },
             { key: 'left', x: -gap, y: 0, label: '◀' }
         ];
-
-        const dpadX = margin;
-        const dpadY = baseY;
 
         dpad.forEach(({ key, x, y, label }) => {
             const bx = dpadX + x;
@@ -131,7 +132,7 @@ class MainScene extends Phaser.Scene {
                 .setInteractive({ useHandCursor: true });
 
             this.add.text(bx, by, label, {
-                font: '22px Arial',
+                font: Math.round(22 * 0.85) + 'px Arial',
                 fill: '#ffffff'
             }).setOrigin(0.5).setScrollFactor(0).setDepth(depth + 1);
 
@@ -149,9 +150,8 @@ class MainScene extends Phaser.Scene {
             btn.on('pointerout', release);
         });
 
-        const shootX = this.scale.width - margin;
-        const shootY = baseY;
-        const shootRadius = 48;
+        const shootX = this.scale.width - pad - shootRadius;
+        const shootY = dpadY;
 
         this.shootHudBtn = this.add.circle(shootX, shootY, shootRadius, 0xcc3333, 0.4)
             .setStrokeStyle(3, 0xffffff, 0.5)
@@ -160,7 +160,7 @@ class MainScene extends Phaser.Scene {
             .setInteractive({ useHandCursor: true });
 
         this.add.image(shootX, shootY, 'bullet')
-            .setScale(1.4)
+            .setScale(1.4 * 0.85)
             .setScrollFactor(0)
             .setDepth(depth + 1);
 
