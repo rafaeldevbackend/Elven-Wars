@@ -92,10 +92,10 @@ class MainScene extends Phaser.Scene {
         this.hudBottomPad = 45;
         this.hpText = this.add.text(10, 10, 'HP: ' + this.player.health, { font: '16px Arial', fill: '#fff' }).setScrollFactor(0);
         this.createMinimapHud();
-        this.createAngleHud();
         this.createShootTimerHud();
         this.createForceHud();
         this.createControlHud();
+        this.createAngleHud();
     }
 
     createPlatforms() {
@@ -145,6 +145,9 @@ class MainScene extends Phaser.Scene {
         const dpadX = pad + dpadExtent;
         const bottomPad = this.hudBottomPad;
         const dpadY = this.scale.height - bottomPad - gap - btnRadius;
+        this.controlHudRight = dpadX + dpadExtent;
+        this.controlHudTop = dpadY - gap - btnRadius;
+        this.controlHudBottom = dpadY + gap + btnRadius;
 
         this.touchControls = { up: false, right: false, down: false, left: false };
 
@@ -185,6 +188,9 @@ class MainScene extends Phaser.Scene {
 
         const shootX = this.scale.width - pad - shootRadius;
         const shootY = this.scale.height - bottomPad - shootRadius;
+        this.controlHudShootX = shootX;
+        this.controlHudShootY = shootY;
+        this.controlHudShootRadius = shootRadius;
 
         this.shootHudBtn = this.add.circle(shootX, shootY, shootRadius, 0xcc3333, 0.4)
             .setStrokeStyle(3, 0xffffff, 0.5)
@@ -214,18 +220,34 @@ class MainScene extends Phaser.Scene {
     }
 
     createAngleHud() {
-        const padding = 10;
+        const depth = 26;
+        const gapAfterControls = 30;
+        const labelPad = 38;
+        const controlRight = this.controlHudRight ?? 160;
+        const zoneTop = this.controlHudTop ?? 0;
+        const zoneBottom = this.forceHudTop ?? (this.scale.height - 80);
+        const zoneHeight = Math.max(80, zoneBottom - zoneTop);
+        const baseRadius = Phaser.Math.Clamp((zoneHeight - labelPad * 2) / 2, 32, 56);
+        const radius = Math.round(baseRadius * 1.56);
+        const centerX = controlRight + gapAfterControls + radius;
+        const centerY = this.scale.height - this.hudBottomPad - radius;
+
+        this.angleHudCenterX = centerX;
+        this.angleHudCenterY = centerY;
+        this.angleHudRadius = radius;
+
+        this.angleHudGraphics = this.add.graphics().setScrollFactor(0).setDepth(depth);
         this.angleHudText = this.add.text(
-            this.scale.width - padding,
-            this.minimapY + this.minimapHeight + 8,
+            centerX,
+            centerY + radius + 14,
             '',
             {
-                font: '16px Arial',
-                fill: '#fff',
+                font: '18px Arial',
+                fill: '#ffffff',
                 backgroundColor: '#000000aa',
-                padding: { x: 10, y: 6 }
+                padding: { x: 10, y: 5 }
             }
-        ).setOrigin(1, 0).setScrollFactor(0).setDepth(10);
+        ).setOrigin(0.5, 0).setScrollFactor(0).setDepth(depth + 1);
         this.updateAngleHud();
     }
 
@@ -386,9 +408,94 @@ class MainScene extends Phaser.Scene {
     }
 
     updateAngleHud() {
-        const angleDeg = Math.round(Phaser.Math.RadToDeg(-this.weaponAngle));
-        const facingLabel = this.facing === -1 ? 'Esq.' : 'Dir.';
-        this.angleHudText.setText('Ângulo: ' + angleDeg + '° (' + facingLabel + ')');
+        if (!this.angleHudGraphics) return;
+        const g = this.angleHudGraphics;
+        g.clear();
+
+        const cx = this.angleHudCenterX;
+        const cy = this.angleHudCenterY;
+        const radius = this.angleHudRadius;
+        const innerRadius = radius - 12;
+        const rotation = this.getWeaponDisplayRotation();
+        const angleDeg = Phaser.Math.Wrap(Math.round(Phaser.Math.RadToDeg(rotation) + 180), 0, 360);
+
+        g.fillStyle(0x000000, 0.45);
+        g.fillCircle(cx, cy, radius + 6);
+        g.lineStyle(2, 0xffffff, 0.72);
+        g.strokeCircle(cx, cy, radius);
+        g.lineStyle(1, 0xffffff, 0.22);
+        g.strokeCircle(cx, cy, innerRadius);
+
+        for (let deg = 0; deg < 360; deg += 10) {
+            const rad = Phaser.Math.DegToRad(deg);
+            const isMajor = deg % 30 === 0;
+            const tickOuter = radius - 2;
+            const tickInner = isMajor ? radius - 11 : radius - 7;
+            const x1 = cx + Math.cos(rad) * tickInner;
+            const y1 = cy + Math.sin(rad) * tickInner;
+            const x2 = cx + Math.cos(rad) * tickOuter;
+            const y2 = cy + Math.sin(rad) * tickOuter;
+            g.lineStyle(isMajor ? 2 : 1, 0xffffff, isMajor ? 0.52 : 0.25);
+            g.beginPath();
+            g.moveTo(x1, y1);
+            g.lineTo(x2, y2);
+            g.strokePath();
+        }
+
+        const cardinal = [
+            { label: '180', deg: 0 },
+            { label: '270', deg: 90 },
+            { label: '0', deg: 180 },
+            { label: '90', deg: 270 }
+        ];
+        cardinal.forEach((item) => {
+            const rad = Phaser.Math.DegToRad(item.deg);
+            const tx = cx + Math.cos(rad) * (innerRadius - 12);
+            const ty = cy + Math.sin(rad) * (innerRadius - 12);
+            g.fillStyle(0xffffff, 0.9);
+            g.fillRect(tx - 1, ty - 1, 2, 2);
+            g.lineStyle(1, 0x99bbff, 0.7);
+            g.strokeCircle(tx, ty, 2);
+            if (!this.angleHudLabels) this.angleHudLabels = [];
+        });
+
+        if (!this.angleHudLabels || this.angleHudLabels.length === 0) {
+            this.angleHudLabels = cardinal.map((item) => {
+                const rad = Phaser.Math.DegToRad(item.deg);
+                const tx = cx + Math.cos(rad) * (innerRadius - 24);
+                const ty = cy + Math.sin(rad) * (innerRadius - 24);
+                return this.add.text(tx, ty, item.label, {
+                    font: '11px Arial',
+                    fill: '#b7dcff'
+                }).setOrigin(0.5).setScrollFactor(0).setDepth(27);
+            });
+        }
+
+        const pointerLen = radius - 14;
+        const px = cx + Math.cos(rotation) * pointerLen;
+        const py = cy + Math.sin(rotation) * pointerLen;
+        g.lineStyle(4, 0x58e06b, 0.95);
+        g.beginPath();
+        g.moveTo(cx, cy);
+        g.lineTo(px, py);
+        g.strokePath();
+
+        const mirrorRotation = rotation + Math.PI;
+        const mirrorLen = radius - 24;
+        const mx = cx + Math.cos(mirrorRotation) * mirrorLen;
+        const my = cy + Math.sin(mirrorRotation) * mirrorLen;
+        g.lineStyle(2, 0x7bb8ff, 0.8);
+        g.beginPath();
+        g.moveTo(cx, cy);
+        g.lineTo(mx, my);
+        g.strokePath();
+
+        g.fillStyle(0xffffff, 0.9);
+        g.fillCircle(cx, cy, 4);
+
+        if (this.angleHudText) {
+            this.angleHudText.setText('Ângulo: ' + angleDeg + '°');
+        }
     }
 
     applyPlayerFacing() {
@@ -513,8 +620,10 @@ class MainScene extends Phaser.Scene {
         const centerY = this.scale.height - this.hudBottomPad - barHeight / 2;
 
         this.forceHudBarWidth = barWidth - barInset;
+        this.forceHudBarHeight = barHeight;
         this.forceHudCenterX = centerX;
         this.forceHudY = centerY;
+        this.forceHudTop = centerY - barHeight / 2;
 
         this.forceHudBg = this.add.rectangle(centerX, centerY, barWidth, barHeight, 0x1a1a1a, 0.9)
             .setStrokeStyle(2, 0xffffff, 0.35)
