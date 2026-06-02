@@ -55,7 +55,7 @@ class MainScene extends Phaser.Scene {
 
         // inimigos
         this.enemies = this.physics.add.group();
-        for (let i = 0; i < 6; i++) {
+        for (let i = 0; i < 1; i++) {
             const x = (this.worldWidth / 7) * (i + 1);
             const e = this.enemies.create(x, 80 + (i % 2) * 120, 'ant').setScale(1.6);
             e.setTint(0xff6666);
@@ -63,7 +63,7 @@ class MainScene extends Phaser.Scene {
             e.speed = 40 + Math.random() * 60;
             e.dir = Math.random() > 0.5 ? 1 : -1;
             e.setCollideWorldBounds(true);
-            e.setVelocityX(e.dir * e.speed);
+            e.setVelocityX(0);
         }
         this.physics.add.collider(this.enemies, this.platforms);
 
@@ -458,17 +458,7 @@ class MainScene extends Phaser.Scene {
         this.weapon.setPosition(this.player.x, this.player.y);
         this.weapon.setRotation(this.getWeaponDisplayRotation());
 
-        // inimigos patrulham horizontalmente
-        this.enemies.getChildren().forEach(e => {
-            if (e.x < 40) {
-                e.dir = 1;
-                e.setVelocityX(e.speed);
-            }
-            if (e.x > this.worldWidth - 40) {
-                e.dir = -1;
-                e.setVelocityX(-e.speed);
-            }
-        });
+        // inimigo sem movimento automático no eixo X
 
         // delay de 3 s antes de cada reinício do timer
         if (this.shootRestartDelayRemaining > 0) {
