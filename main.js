@@ -91,6 +91,7 @@ class MainScene extends Phaser.Scene {
         // HUD (distância da borda inferior da tela)
         this.hudBottomPad = 45;
         this.hpText = this.add.text(10, 10, 'HP: ' + this.player.health, { font: '16px Arial', fill: '#fff' }).setScrollFactor(0);
+        this.createMinimapHud();
         this.createAngleHud();
         this.createShootTimerHud();
         this.createForceHud();
@@ -216,7 +217,7 @@ class MainScene extends Phaser.Scene {
         const padding = 10;
         this.angleHudText = this.add.text(
             this.scale.width - padding,
-            padding,
+            this.minimapY + this.minimapHeight + 8,
             '',
             {
                 font: '16px Arial',
@@ -226,6 +227,162 @@ class MainScene extends Phaser.Scene {
             }
         ).setOrigin(1, 0).setScrollFactor(0).setDepth(10);
         this.updateAngleHud();
+    }
+
+    createMinimapHud() {
+        const margin = 12;
+        this.minimapWidth = 240;
+        this.minimapHeight = 140;
+        this.minimapX = this.scale.width - this.minimapWidth - margin;
+        this.minimapY = margin;
+        this.minimapPointSize = 5;
+        this.isMinimapDragging = false;
+        this.minimapViewportWidth = 0;
+        this.minimapViewportHeight = 0;
+        this.minimapLastPointerX = 0;
+        this.minimapLastPointerY = 0;
+
+        this.minimapBackground = this.add.rectangle(
+            this.minimapX + this.minimapWidth / 2,
+            this.minimapY + this.minimapHeight / 2,
+            this.minimapWidth,
+            this.minimapHeight,
+            0x000000,
+            0.45
+        ).setOrigin(0.5).setScrollFactor(0).setDepth(18)
+            .setStrokeStyle(2, 0xffffff, 0.55);
+
+        this.minimapGraphics = this.add.graphics().setScrollFactor(0).setDepth(19);
+        this.minimapViewportHandle = this.add.rectangle(
+            this.minimapX,
+            this.minimapY,
+            10,
+            10
+        )
+            .setOrigin(0)
+            .setScrollFactor(0)
+            .setDepth(20)
+            .setStrokeStyle(2, 0x88ccff, 0.95)
+            .setFillStyle(0x88ccff, 0.1)
+            .setInteractive({ useHandCursor: true });
+
+        this.minimapViewportHandle.on('pointerdown', (pointer) => this.startMinimapDrag(pointer));
+        this.input.on('pointermove', (pointer) => this.updateMinimapDrag(pointer));
+        this.input.on('pointerup', () => this.stopMinimapDrag());
+
+        this.updateMinimapHud();
+    }
+
+    mapToMinimapX(worldX) {
+        return this.minimapX + (worldX / this.worldWidth) * this.minimapWidth;
+    }
+
+    mapToMinimapY(worldY) {
+        return this.minimapY + (worldY / this.worldHeight) * this.minimapHeight;
+    }
+
+    moveCameraFromMinimapDrag(rawX, rawY) {
+        const cam = this.cameras.main;
+        const maxScrollX = Math.max(0, this.worldWidth - cam.width);
+        const maxScrollY = Math.max(0, this.worldHeight - cam.height);
+        const viewW = this.minimapViewportWidth;
+        const viewH = this.minimapViewportHeight;
+        const maxViewX = this.minimapX + this.minimapWidth - viewW;
+        const maxViewY = this.minimapY + this.minimapHeight - viewH;
+        const viewX = Phaser.Math.Clamp(rawX, this.minimapX, maxViewX);
+        const viewY = Phaser.Math.Clamp(rawY, this.minimapY, maxViewY);
+        const rangeX = this.minimapWidth - viewW;
+        const rangeY = this.minimapHeight - viewH;
+        const tx = rangeX > 0 ? (viewX - this.minimapX) / rangeX : 0;
+        const ty = rangeY > 0 ? (viewY - this.minimapY) / rangeY : 0;
+
+        cam.scrollX = tx * maxScrollX;
+        cam.scrollY = ty * maxScrollY;
+
+        return { viewX, viewY };
+    }
+
+    startMinimapDrag(pointer) {
+        this.isMinimapDragging = true;
+        this.cameraFollowsBullet = false;
+        this.cameras.main.stopFollow();
+        this.minimapLastPointerX = pointer.x;
+        this.minimapLastPointerY = pointer.y;
+    }
+
+    updateMinimapDrag(pointer) {
+        if (!this.isMinimapDragging) return;
+        if (!pointer.isDown) {
+            this.stopMinimapDrag();
+            return;
+        }
+
+        const deltaX = pointer.x - this.minimapLastPointerX;
+        const deltaY = pointer.y - this.minimapLastPointerY;
+        this.minimapLastPointerX = pointer.x;
+        this.minimapLastPointerY = pointer.y;
+
+        const nextX = this.minimapViewportHandle.x + deltaX;
+        const nextY = this.minimapViewportHandle.y + deltaY;
+        const clampedPos = this.moveCameraFromMinimapDrag(nextX, nextY);
+        this.minimapViewportHandle.setPosition(clampedPos.viewX, clampedPos.viewY);
+    }
+
+    stopMinimapDrag() {
+        this.isMinimapDragging = false;
+        if (this.playerBullet && this.playerBullet.active) {
+            this.focusBulletCamera();
+            return;
+        }
+        this.focusPlayerCamera();
+    }
+
+    updateMinimapHud() {
+        if (!this.minimapGraphics) return;
+        const g = this.minimapGraphics;
+        g.clear();
+
+        const cam = this.cameras.main;
+        const viewW = Math.max(12, (cam.width / this.worldWidth) * this.minimapWidth);
+        const viewH = Math.max(12, (cam.height / this.worldHeight) * this.minimapHeight);
+        this.minimapViewportWidth = viewW;
+        this.minimapViewportHeight = viewH;
+
+        const playerX = this.mapToMinimapX(this.player.x);
+        const playerY = this.mapToMinimapY(this.player.y);
+        g.fillStyle(0x33dd66, 1);
+        g.fillRect(
+            playerX - this.minimapPointSize / 2,
+            playerY - this.minimapPointSize / 2,
+            this.minimapPointSize,
+            this.minimapPointSize
+        );
+
+        g.fillStyle(0xff6666, 0.95);
+        this.enemies.children.each((enemy) => {
+            if (!enemy || !enemy.active) return;
+            const ex = this.mapToMinimapX(enemy.x);
+            const ey = this.mapToMinimapY(enemy.y);
+            g.fillRect(ex - 2, ey - 2, 4, 4);
+        });
+
+        if (this.playerBullet && this.playerBullet.active) {
+            const bx = this.mapToMinimapX(this.playerBullet.x);
+            const by = this.mapToMinimapY(this.playerBullet.y);
+            g.fillStyle(0xffee66, 1);
+            g.fillRect(bx - 2, by - 2, 4, 4);
+        }
+
+        const maxScrollX = Math.max(0, this.worldWidth - cam.width);
+        const maxScrollY = Math.max(0, this.worldHeight - cam.height);
+        const rangeX = this.minimapWidth - viewW;
+        const rangeY = this.minimapHeight - viewH;
+        const viewX = this.minimapX + (maxScrollX > 0 ? (cam.scrollX / maxScrollX) * rangeX : 0);
+        const viewY = this.minimapY + (maxScrollY > 0 ? (cam.scrollY / maxScrollY) * rangeY : 0);
+        this.minimapViewportHandle.setSize(viewW, viewH);
+        if (!this.isMinimapDragging) {
+            this.minimapViewportHandle.setPosition(viewX, viewY);
+        }
     }
 
     updateAngleHud() {
@@ -480,6 +637,7 @@ class MainScene extends Phaser.Scene {
         this.updateAngleHud();
         this.updateShootTimerHud();
         this.updateForceHud();
+        this.updateMinimapHud();
     }
 
     shoot(chargeTime) {
