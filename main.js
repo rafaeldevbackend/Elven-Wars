@@ -87,6 +87,7 @@ class MainScene extends Phaser.Scene {
         this.spaceKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
         this.input.keyboard.on('keydown-SPACE', () => this.beginCharge());
         this.input.keyboard.on('keyup-SPACE', () => this.endCharge());
+        this.input.mouse.disableContextMenu();
 
         // HUD (distância da borda inferior da tela)
         this.hudBottomPad = 45;
@@ -692,14 +693,63 @@ class MainScene extends Phaser.Scene {
             0x3ecf6e
         ).setOrigin(0, 0.5).setScrollFactor(0).setDepth(11);
 
-        this.forceHudText = this.add.text(centerX, centerY - 45, 'Força: 0', {
-            font: '24px Arial',
-            fill: '#fff',
+        this.forceHudMarkerPercent = null;
+        this.forceHudMarker = this.add.rectangle(0, centerY, 3, barHeight - 4, 0xffcc00, 1)
+            .setOrigin(0.5, 0.5)
+            .setScrollFactor(0)
+            .setDepth(12)
+            .setVisible(false);
+        this.forceHudMarkerLabel = this.add.text(0, centerY - barHeight / 2 - 4, '', {
+            font: '14px Arial',
+            fill: '#ffcc00',
             backgroundColor: '#000000aa',
-            padding: { x: 12, y: 6 }
-        }).setOrigin(0.5, 0.5).setScrollFactor(0).setDepth(10);
+            padding: { x: 6, y: 2 }
+        }).setOrigin(0.5, 1).setScrollFactor(0).setDepth(12).setVisible(false);
+
+        this.forceHudBg.setInteractive({ useHandCursor: true });
+        this.forceHudBg.on('pointerdown', (pointer) => this.onForceHudPointerDown(pointer));
 
         this.updateForceHud();
+    }
+
+    forceHudPointerToPercent(pointerX) {
+        const barLeft = this.forceHudCenterX - this.forceHudBarWidth / 2;
+        return Math.round(Phaser.Math.Clamp((pointerX - barLeft) / this.forceHudBarWidth, 0, 1) * 100);
+    }
+
+    onForceHudPointerDown(pointer) {
+        if (pointer.button === 2) {
+            this.clearForceHudMarker();
+            return;
+        }
+        this.setForceHudMarker(this.forceHudPointerToPercent(pointer.x));
+    }
+
+    setForceHudMarker(percent) {
+        this.forceHudMarkerPercent = percent;
+        this.updateForceHudMarker();
+        this.updateForceHud();
+    }
+
+    clearForceHudMarker() {
+        this.forceHudMarkerPercent = null;
+        this.updateForceHudMarker();
+        this.updateForceHud();
+    }
+
+    updateForceHudMarker() {
+        if (this.forceHudMarkerPercent == null) {
+            this.forceHudMarker.setVisible(false);
+            this.forceHudMarkerLabel.setVisible(false);
+            return;
+        }
+        const x = this.forceHudCenterX - this.forceHudBarWidth / 2
+            + (this.forceHudMarkerPercent / 100) * this.forceHudBarWidth;
+        this.forceHudMarker.setPosition(x, this.forceHudY);
+        this.forceHudMarker.setVisible(true);
+        this.forceHudMarkerLabel.setPosition(x, this.forceHudY - this.forceHudBarHeight / 2 - 4);
+        this.forceHudMarkerLabel.setText('▲ ' + this.forceHudMarkerPercent);
+        this.forceHudMarkerLabel.setVisible(true);
     }
 
     chargeTimeToForcePercent(chargeTime) {
@@ -719,7 +769,7 @@ class MainScene extends Phaser.Scene {
     updateForceHud() {
         const force = this.getDisplayForcePercent();
         this.forceHudFill.width = (force / 100) * this.forceHudBarWidth;
-        this.forceHudText.setText('Força: ' + force);
+        this.updateForceHudMarker();
 
         const t = force / 100;
         const r = Math.round(Phaser.Math.Linear(62, 231, t));
