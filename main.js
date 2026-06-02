@@ -72,10 +72,10 @@ class MainScene extends Phaser.Scene {
         this.keys = this.input.keyboard.addKeys('A,D,W,S');
 
         // ângulo da arma (bloco preto) — setas/W/S cima/baixo
-        this.weaponAngle = -Math.PI / 4;
+        this.weaponBaseElevationDeg = 15;
+        this.weaponElevationSpanDeg = 50;
         this.weaponAngleSpeedDeg = 13;
-        this.weaponMinAngle = -Math.PI + 0.1;
-        this.weaponMaxAngle = -0.1;
+        this.weaponAngle = this.elevationDegToWeaponAngle(this.getWeaponBaseElevationDeg());
         this.weapon = this.add.rectangle(this.player.x, this.player.y, 24, 8, 0x000000);
         this.weapon.setOrigin(0, 0.5).setDepth(1);
 
@@ -103,6 +103,7 @@ class MainScene extends Phaser.Scene {
         const tileW = tileTex.width * 0.15;
         const tileH = tileTex.height * 0.15;
 
+        this.platformTileW = tileW;
         this.mainPlatformTiles = Math.ceil(this.worldWidth / tileW);
         this.mainPlatformWidth = this.worldWidth;
         this.mainPlatformHeight = tileH;
@@ -417,18 +418,23 @@ class MainScene extends Phaser.Scene {
         const radius = this.angleHudRadius;
         const innerRadius = radius - 12;
         const rotation = this.getWeaponDisplayRotation();
-        const angleDeg = Phaser.Math.Wrap(Math.round(Phaser.Math.RadToDeg(rotation) + 180), 0, 360);
+        const angleDeg = this.weaponRotationToHudDeg(rotation);
 
         g.fillStyle(0x000000, 0.45);
         g.fillCircle(cx, cy, radius + 6);
         g.lineStyle(2, 0xffffff, 0.72);
-        g.strokeCircle(cx, cy, radius);
+        g.beginPath();
+        g.arc(cx, cy, radius, Phaser.Math.DegToRad(180), Phaser.Math.DegToRad(360), false);
+        g.strokePath();
         g.lineStyle(1, 0xffffff, 0.22);
-        g.strokeCircle(cx, cy, innerRadius);
+        g.beginPath();
+        g.arc(cx, cy, innerRadius, Phaser.Math.DegToRad(180), Phaser.Math.DegToRad(360), false);
+        g.strokePath();
 
-        for (let deg = 0; deg < 360; deg += 10) {
-            const rad = Phaser.Math.DegToRad(deg);
-            const isMajor = deg % 30 === 0;
+        for (let hudTick = 0; hudTick <= 90; hudTick += 10) {
+            const canvasDeg = hudTick <= 45 ? 180 + hudTick * 2 : 360 - (90 - hudTick) * 2;
+            const rad = Phaser.Math.DegToRad(canvasDeg);
+            const isMajor = hudTick % 30 === 0;
             const tickOuter = radius - 2;
             const tickInner = isMajor ? radius - 11 : radius - 7;
             const x1 = cx + Math.cos(rad) * tickInner;
@@ -443,10 +449,9 @@ class MainScene extends Phaser.Scene {
         }
 
         const cardinal = [
-            { label: '180', deg: 0 },
-            { label: '270', deg: 90 },
             { label: '0', deg: 180 },
-            { label: '90', deg: 270 }
+            { label: '90', deg: 270 },
+            { label: '0', deg: 0 }
         ];
         cardinal.forEach((item) => {
             const rad = Phaser.Math.DegToRad(item.deg);
@@ -458,6 +463,11 @@ class MainScene extends Phaser.Scene {
             g.strokeCircle(tx, ty, 2);
             if (!this.angleHudLabels) this.angleHudLabels = [];
         });
+
+        if (this.angleHudLabels && this.angleHudLabels.length !== cardinal.length) {
+            this.angleHudLabels.forEach((label) => label.destroy());
+            this.angleHudLabels = null;
+        }
 
         if (!this.angleHudLabels || this.angleHudLabels.length === 0) {
             this.angleHudLabels = cardinal.map((item) => {
@@ -542,8 +552,52 @@ class MainScene extends Phaser.Scene {
         }
     }
 
+    elevationDegToWeaponAngle(elevationDeg) {
+        return -Phaser.Math.DegToRad(elevationDeg);
+    }
+
+    getGroundSurfaceYAt(worldX) {
+        let surfaceY = null;
+        this.platforms.children.each((tile) => {
+            const body = tile.body;
+            if (!body) return;
+            if (worldX < body.left || worldX > body.right) return;
+            const top = body.top;
+            if (surfaceY === null || top < surfaceY) surfaceY = top;
+        });
+        return surfaceY;
+    }
+
+    getTerrainSlopeDeg() {
+        const sample = (this.platformTileW || 40) * 0.5;
+        const x = this.player.x;
+        const leftY = this.getGroundSurfaceYAt(x - sample);
+        const rightY = this.getGroundSurfaceYAt(x + sample);
+        if (leftY === null || rightY === null) return 0;
+        const rise = leftY - rightY;
+        const run = sample * 2;
+        if (run === 0) return 0;
+        return Phaser.Math.RadToDeg(Math.atan2(rise, run));
+    }
+
+    getWeaponBaseElevationDeg() {
+        return this.weaponBaseElevationDeg + this.getTerrainSlopeDeg();
+    }
+
+    updateWeaponAngleLimits() {
+        const minElev = this.getWeaponBaseElevationDeg();
+        const maxElev = minElev + this.weaponElevationSpanDeg;
+        this.weaponMinAngle = this.elevationDegToWeaponAngle(maxElev);
+        this.weaponMaxAngle = this.elevationDegToWeaponAngle(minElev);
+    }
+
     getWeaponDisplayRotation() {
         return this.facing === -1 ? Math.PI - this.weaponAngle : this.weaponAngle;
+    }
+
+    weaponRotationToHudDeg(rotation) {
+        const elevRad = Math.atan2(-Math.sin(rotation), Math.abs(Math.cos(rotation)));
+        return Phaser.Math.Clamp(Math.round(Phaser.Math.RadToDeg(elevRad)), 0, 90);
     }
 
     createShootTimerHud() {
@@ -712,6 +766,8 @@ class MainScene extends Phaser.Scene {
         } else {
             this.player.setVelocityX(0);
         }
+
+        this.updateWeaponAngleLimits();
 
         // ajuste de ângulo: cima/W sobem o ângulo; baixo/S descem
         const angleStep = Phaser.Math.DegToRad(this.weaponAngleSpeedDeg) * delta / 1000;
