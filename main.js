@@ -402,18 +402,21 @@ class MainScene extends Phaser.Scene {
     }
 
     focusPlayerCamera() {
+        if (this.isMinimapDragging) return;
         this.cameraFollowsBullet = false;
         this.cameras.main.stopFollow();
         this.cameras.main.startFollow(this.player, true, 0.12, 0);
     }
 
     focusBulletCamera() {
+        if (this.isMinimapDragging) return;
         if (!this.hasMapScrollRoom()) return;
         this.cameraFollowsBullet = true;
         this.cameras.main.stopFollow();
     }
 
     updateCamera(delta) {
+        if (this.isMinimapDragging) return;
         if (!this.cameraFollowsBullet || !this.playerBullet) return;
 
         const cam = this.cameras.main;
