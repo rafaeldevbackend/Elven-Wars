@@ -2,6 +2,7 @@ class MainScene extends Phaser.Scene {
 
     preload() {
         this.load.image('vilaBg', './assets/maps/vila-elfica/vila-élfica-bg.png');
+        this.load.image('defaultTile', './assets/tiles/default-tile.png');
         this.textures.generate('ant', { data: ['..###..', '..###..', '..###..'], pixelWidth: 6 });
         this.load.image('bullet', './assets/bullet.png');
     }
@@ -11,7 +12,7 @@ class MainScene extends Phaser.Scene {
         this.worldWidth = mapTex.width;
         this.worldHeight = mapTex.height;
 
-        this.physics.world.setBounds(0, 0, this.worldWidth, this.worldHeight);
+        this.physics.world.setBounds(0, 0, this.worldWidth, this.worldHeight, true, true, true, false);
 
         const bg = this.add.image(this.worldWidth / 2, this.worldHeight / 2, 'vilaBg');
         bg.setDepth(-100);
@@ -19,11 +20,14 @@ class MainScene extends Phaser.Scene {
         this.cameras.main.setBounds(0, 0, this.worldWidth, this.worldHeight);
         this.cameras.main.setBackgroundColor('#1a2a1a');
 
-        // jogador nasce na parte inferior do mapa
+        this.createPlatforms();
+
+        // jogador nasce sobre a plataforma principal
         const spawnX = this.worldWidth / 2;
-        const spawnY = this.worldHeight - 60;
+        const spawnY = this.mainPlatformY - this.mainPlatformHeight / 2 - 20;
         this.player = this.physics.add.sprite(spawnX, spawnY, 'ant').setScale(2);
         this.player.setCollideWorldBounds(true);
+        this.physics.add.collider(this.player, this.platforms);
         this.cameraFollowsBullet = false;
         this.focusPlayerCamera();
         this.player.speed = 65;
@@ -45,6 +49,9 @@ class MainScene extends Phaser.Scene {
 
         // balas
         this.bullets = this.physics.add.group({ classType: Phaser.Physics.Arcade.Image, runChildUpdate: true });
+        this.physics.add.collider(this.bullets, this.platforms, (bullet) => {
+            this.destroyPlayerBullet(bullet);
+        });
 
         // inimigos
         this.enemies = this.physics.add.group();
@@ -55,7 +62,10 @@ class MainScene extends Phaser.Scene {
             e.health = 30;
             e.speed = 40 + Math.random() * 60;
             e.dir = Math.random() > 0.5 ? 1 : -1;
+            e.setCollideWorldBounds(true);
+            e.setVelocityX(e.dir * e.speed);
         }
+        this.physics.add.collider(this.enemies, this.platforms);
 
         // controles
         this.cursors = this.input.keyboard.createCursorKeys();
@@ -85,6 +95,26 @@ class MainScene extends Phaser.Scene {
         this.createShootTimerHud();
         this.createForceHud();
         this.createControlHud();
+    }
+
+    createPlatforms() {
+        const tileTex = this.textures.get('defaultTile').getSourceImage();
+        const tileW = tileTex.width * 0.15;
+        const tileH = tileTex.height * 0.15;
+
+        this.mainPlatformTiles = Math.ceil(this.worldWidth / tileW);
+        this.mainPlatformWidth = this.worldWidth;
+        this.mainPlatformHeight = tileH;
+        this.mainPlatformY = this.worldHeight - tileH / 2;
+
+        this.platforms = this.physics.add.staticGroup();
+
+        const startX = tileW / 2;
+        for (let i = 0; i < this.mainPlatformTiles; i++) {
+            const tile = this.platforms.create(startX + i * tileW, this.mainPlatformY, 'defaultTile')
+                .setScale(0.15);
+            tile.refreshBody();
+        }
     }
 
     beginCharge() {
@@ -430,9 +460,14 @@ class MainScene extends Phaser.Scene {
 
         // inimigos patrulham horizontalmente
         this.enemies.getChildren().forEach(e => {
-            e.x += e.dir * e.speed * delta / 1000;
-            if (e.x < 40) { e.dir = 1; e.x = 40; }
-            if (e.x > this.worldWidth - 40) { e.dir = -1; e.x = this.worldWidth - 40; }
+            if (e.x < 40) {
+                e.dir = 1;
+                e.setVelocityX(e.speed);
+            }
+            if (e.x > this.worldWidth - 40) {
+                e.dir = -1;
+                e.setVelocityX(-e.speed);
+            }
         });
 
         // delay de 3 s antes de cada reinício do timer
