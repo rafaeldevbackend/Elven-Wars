@@ -901,7 +901,7 @@ class MainScene extends Phaser.Scene {
         });
 
         b.update = () => {
-            if (b.x < 0 || b.x > this.worldWidth || b.y < 0 || b.y > this.worldHeight) {
+            if (b.x < 0 || b.x > this.worldWidth) {
                 this.destroyPlayerBullet(b);
                 return;
             }
