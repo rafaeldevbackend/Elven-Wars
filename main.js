@@ -2,6 +2,7 @@ class MainScene extends Phaser.Scene {
 
     preload() {
         this.load.image('vilaBg', './assets/maps/vila-elfica/vila-élfica-bg.png');
+        this.load.audio('vilaMusic', './assets/maps/vila-elfica/vila-elfica-music.mp3');
         this.load.image('defaultTile', './assets/tiles/default-tile.png');
         this.textures.generate('ant', { data: ['..###..', '..###..', '..###..'], pixelWidth: 6 });
         this.load.image('bullet', './assets/bullet.png');
@@ -16,6 +17,14 @@ class MainScene extends Phaser.Scene {
 
         const bg = this.add.image(this.worldWidth / 2, this.worldHeight / 2, 'vilaBg');
         bg.setDepth(-100);
+
+        this.bgMusic = this.sound.add('vilaMusic', { loop: true, volume: 0.6 });
+        this.bgMusic.play();
+        if (this.sound.locked) {
+            this.sound.once('unlocked', () => {
+                if (!this.bgMusic.isPlaying) this.bgMusic.play();
+            });
+        }
 
         this.cameras.main.setBounds(0, 0, this.worldWidth, this.worldHeight);
         this.cameras.main.setBackgroundColor('#1a2a1a');
